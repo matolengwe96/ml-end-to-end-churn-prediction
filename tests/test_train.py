@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pandas as pd
+import pytest
 
 from src.data_preprocessing import build_preprocessor
 from src.evaluate import compare_models, evaluate_model
@@ -65,3 +66,8 @@ def test_compare_models_prefers_higher_f1_then_auc() -> None:
 
     assert best_name == "ModelB"
     assert best_metrics["roc_auc"] == 0.84
+
+
+def test_compare_models_raises_on_empty_input() -> None:
+    with pytest.raises(ValueError, match="No model results"):
+        compare_models({})

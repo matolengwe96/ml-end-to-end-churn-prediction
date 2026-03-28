@@ -4,20 +4,38 @@
     "precision": 0.6484848484848484,
     "recall": 0.5721925133689839,
     "f1": 0.6079545454545454,
-    "roc_auc": 0.8359290473207676
+    "roc_auc": 0.8359290473207676,
+    "true_negatives": 917.0,
+    "false_positives": 116.0,
+    "false_negatives": 160.0,
+    "true_positives": 214.0,
+    "cv_f1_mean": 0.596,
+    "cv_f1_std": 0.0224
   },
   "RandomForestClassifier": {
     "accuracy": 0.7903340440653873,
     "precision": 0.6357388316151202,
     "recall": 0.4946524064171123,
     "f1": 0.556390977443609,
-    "roc_auc": 0.8127941047051577
+    "roc_auc": 0.8127941047051577,
+    "true_negatives": 927.0,
+    "false_positives": 106.0,
+    "false_negatives": 189.0,
+    "true_positives": 185.0,
+    "cv_f1_mean": 0.5437,
+    "cv_f1_std": 0.0224
   },
   "GradientBoostingClassifier": {
     "accuracy": 0.7960199004975125,
     "precision": 0.6407766990291263,
     "recall": 0.5294117647058824,
     "f1": 0.5797950219619327,
-    "roc_auc": 0.8385238985147876
+    "roc_auc": 0.8385238985147876,
+    "true_negatives": 922.0,
+    "false_positives": 111.0,
+    "false_negatives": 176.0,
+    "true_positives": 198.0,
+    "cv_f1_mean": 0.5826,
+    "cv_f1_std": 0.0282
   }
 }

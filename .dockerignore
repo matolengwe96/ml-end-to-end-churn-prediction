@@ -1,0 +1,16 @@
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ruff_cache/
+.git/
+.github/
+logs/
+data/processed/
+reports/figures/
+*.ipynb_checkpoints/
+.env
+node_modules/

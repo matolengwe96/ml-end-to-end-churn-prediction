@@ -25,6 +25,31 @@ def _to_dataframe(data: pd.DataFrame | Mapping[str, Any]) -> pd.DataFrame:
     raise TypeError("Input must be a pandas DataFrame or a dict-like record.")
 
 
+def _expected_feature_order(pipeline: Any) -> list[str] | None:
+    """Extract expected feature names from fitted pipeline when available."""
+    features = getattr(pipeline, "feature_names_in_", None)
+    if features is None:
+        return None
+    return [str(name) for name in features.tolist()]
+
+
+def _validate_and_align_features(features: pd.DataFrame, pipeline: Any) -> pd.DataFrame:
+    """Validate required columns and align order for stable inference."""
+    expected_features = _expected_feature_order(pipeline)
+    if expected_features is None:
+        return features
+
+    missing = [column for column in expected_features if column not in features.columns]
+    if missing:
+        raise ValueError(
+            "Missing required input features: "
+            f"{missing}. Provide all model input columns."
+        )
+
+    # Ignore unexpected columns and force expected order.
+    return features[expected_features].copy()
+
+
 def predict_batch(
     data: pd.DataFrame | Mapping[str, Any],
     model: Any | None = None,
@@ -33,6 +58,7 @@ def predict_batch(
     """Predict churn classes for one or many records."""
     pipeline = model if model is not None else load_model(model_path)
     features = _to_dataframe(data)
+    features = _validate_and_align_features(features, pipeline)
 
     raw_predictions = pipeline.predict(features)
     predicted_labels = ["Churn" if int(value) == 1 else "No Churn" for value in raw_predictions]

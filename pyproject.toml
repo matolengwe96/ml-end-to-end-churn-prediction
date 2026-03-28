@@ -1,0 +1,36 @@
+[project]
+name = "ml-end-to-end-churn-prediction"
+version = "0.1.0"
+description = "Enterprise-ready telecom churn prediction pipeline and Streamlit app"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Matolengwe" }]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+addopts = "-q"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.coverage.run]
+source = ["src", "api"]
+omit = ["*/tests/*", "src/__init__.py"]
+
+[tool.coverage.report]
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+]

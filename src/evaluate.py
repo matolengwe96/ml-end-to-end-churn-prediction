@@ -5,7 +5,14 @@ from __future__ import annotations
 from typing import Any
 
 import numpy as np
-from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score
+from sklearn.metrics import (
+    accuracy_score,
+    confusion_matrix,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
 
 
 def evaluate_model(
@@ -25,11 +32,23 @@ def evaluate_model(
     if y_proba is not None:
         metrics["roc_auc"] = float(roc_auc_score(y_true, y_proba))
 
+    tn, fp, fn, tp = confusion_matrix(y_true, y_pred, labels=[0, 1]).ravel()
+    metrics.update(
+        {
+            "true_negatives": float(tn),
+            "false_positives": float(fp),
+            "false_negatives": float(fn),
+            "true_positives": float(tp),
+        }
+    )
+
     return metrics
 
 
 def compare_models(results: dict[str, dict[str, float | None]]) -> tuple[str, dict[str, float | None]]:
     """Select best model by F1, with ROC-AUC as tie-breaker."""
+    if not results:
+        raise ValueError("No model results provided for comparison.")
 
     def ranking_key(item: tuple[str, dict[str, float | None]]) -> tuple[float, float]:
         _, metric_values = item
@@ -45,15 +64,17 @@ def format_training_summary(results: dict[str, dict[str, float | None]]) -> str:
     """Generate compact plain-text summary of model metrics."""
     lines = ["Model Performance Summary", "-" * 28]
     for model_name, metrics in results.items():
+        roc_auc_value = metrics.get("roc_auc")
+        roc_auc_text = f"{float(roc_auc_value):.3f}" if roc_auc_value is not None else "N/A"
         lines.append(
-            (
+            
                 f"{model_name:<24} "
                 f"Acc={metrics['accuracy']:.3f} "
                 f"Prec={metrics['precision']:.3f} "
                 f"Rec={metrics['recall']:.3f} "
                 f"F1={metrics['f1']:.3f} "
-                f"ROC_AUC={metrics['roc_auc'] if metrics['roc_auc'] is not None else 'N/A'}"
-            )
+                f"ROC_AUC={roc_auc_text}"
+            
         )
     return "\n".join(lines)
 

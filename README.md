@@ -1,47 +1,50 @@
-# Telecom Customer Churn Prediction
+# Telecom Churn Prediction Platform
 
-An end-to-end machine learning project that predicts telecom customer churn and exposes predictions through a Streamlit web app.
+Enterprise-grade, portfolio-ready machine learning project that predicts telecom customer churn and serves predictions through a production-style Streamlit interface.
 
-## Project Overview
+## Why this project matters
 
-Customer churn is a critical business problem in telecom because acquiring a new customer is often more expensive than retaining an existing one. This project builds a practical churn scoring workflow that can help prioritize retention actions.
+In telecom, churn directly impacts revenue, customer lifetime value, and acquisition cost. The goal is to identify high-risk customers early so retention teams can intervene with the right offer before cancellation.
 
-The application includes:
+## Solution overview
 
-- reliable data loading and cleaning for the Telco Customer Churn dataset
-- reusable preprocessing with sklearn pipelines
-- multi-model training and comparison
-- model artifact saving for repeatable inference
-- an interactive Streamlit prediction app
-- automated tests for core training and prediction logic
+This repository implements a complete ML workflow:
 
-## Business Problem
-
-Given a customer profile (contract type, internet service, billing behavior, tenure, and monthly charges), predict whether the customer is likely to churn.
-
-Target:
-
-- `Churn = Yes` (1): likely to leave
-- `Churn = No` (0): likely to stay
-
-Primary model selection metric:
-
-- **F1 score** (balances precision and recall for churn detection)
-- ROC-AUC used as tie-breaker when F1 is very close
+1. Reliable data ingestion and cleaning for Telco churn data
+2. Reusable preprocessing pipeline (imputation + scaling + one-hot encoding)
+3. Multi-model training and evaluation
+4. Best-model selection by F1 with ROC-AUC tie-breaker
+5. Artifact persistence for reproducible inference
+6. Streamlit app for business-friendly scoring
+7. Test suite and CI pipeline for quality gates
 
 ## Dataset
 
-- Source file: `data/raw/churn.csv`
-- Dataset: Telco Customer Churn
-- Key handling rule implemented:
-  - `TotalCharges` converted to numeric with `errors="coerce"`
-  - rows with invalid `TotalCharges` dropped
-  - `customerID` dropped before modeling
+- Source: [data/raw/churn.csv](data/raw/churn.csv)
+- Target: Churn (`Yes` -> `1`, `No` -> `0`)
+- Key cleaning decisions:
+1. `TotalCharges` is converted using `errors="coerce"`
+2. rows with invalid `TotalCharges` are removed
+3. `customerID` is excluded from modeling
 
-## Project Structure
+## Enterprise features included
+
+1. Centralized runtime settings with environment overrides
+2. Structured logging for training workflows
+3. Inference input validation (required-column checks + feature alignment)
+4. Rich model artifacts:
+  - trained pipeline
+  - model metrics
+  - transformed feature names
+  - training metadata (row counts, timestamp, selected model)
+5. CI automation with lint, tests, and training smoke run
+6. Tooling for reproducible development (`pyproject.toml`, `Makefile`, `ruff`, `pytest`)
+
+## Project structure
 
 ```text
 .
+├── .github/workflows/ci.yml
 ├── app/
 │   └── app.py
 ├── data/
@@ -50,8 +53,9 @@ Primary model selection metric:
 │   └── processed/
 ├── models/
 │   ├── best_model.joblib
-│   ├── model_metrics.json
-│   └── feature_columns.json
+│   ├── feature_columns.json
+│   ├── model_metadata.json
+│   └── model_metrics.json
 ├── notebooks/
 │   └── eda.ipynb
 ├── reports/
@@ -60,8 +64,8 @@ Primary model selection metric:
 │   ├── __init__.py
 │   ├── config.py
 │   ├── data_preprocessing.py
-│   ├── feature_engineering.py
 │   ├── evaluate.py
+│   ├── feature_engineering.py
 │   ├── predict.py
 │   ├── train.py
 │   └── utils.py
@@ -69,110 +73,123 @@ Primary model selection metric:
 │   ├── test_predict.py
 │   └── test_train.py
 ├── .gitignore
+├── Makefile
+├── pyproject.toml
 ├── requirements.txt
 └── README.md
 ```
 
-## Workflow
+## Model training workflow
 
-1. Load and clean raw data
-2. Split features/target and map churn labels to binary
-3. Build preprocessing with `ColumnTransformer`
-4. Train and compare:
-   - Logistic Regression
-   - Random Forest
-   - Gradient Boosting
-5. Select best model by F1 (ROC-AUC tie-breaker)
-6. Save model and metrics
-7. Serve predictions through Streamlit app
+1. Load and clean data using [src/data_preprocessing.py](src/data_preprocessing.py)
+2. Split train/test with reproducible seed from [src/config.py](src/config.py)
+3. Train model candidates in [src/train.py](src/train.py):
+  - LogisticRegression
+  - RandomForestClassifier
+  - GradientBoostingClassifier
+4. Evaluate using [src/evaluate.py](src/evaluate.py)
+5. Persist best model and metadata to [models](models)
 
-## Installation
+## Quick start
 
-From repository root:
+### 1) Create and activate virtual environment
 
 ```bash
 python -m venv .venv
 ```
-
-Activate environment:
 
 ```bash
 # Windows PowerShell
 .\.venv\Scripts\Activate.ps1
 ```
 
-Install dependencies:
+### 2) Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## Train the Model
+### 3) Train models
 
 ```bash
 python -m src.train
 ```
 
-Artifacts created:
+Optional custom dataset path:
 
-- `models/best_model.joblib`
-- `models/model_metrics.json`
-- `models/feature_columns.json`
+```bash
+python -m src.train --data-path data/raw/churn.csv
+```
 
-## Run the Streamlit App
+### 4) Run app
 
 ```bash
 streamlit run app/app.py
 ```
 
-If a trained model is missing, the app shows a clear instruction to run training first.
-
-## Run Tests
+### 5) Run tests
 
 ```bash
-pytest -q
+pytest
 ```
 
-## Sample Prediction Workflow (Python)
+### 6) Run quality checks
+
+```bash
+ruff check src tests app
+```
+
+## Example prediction usage
 
 ```python
 from src.predict import load_model, predict_single
 
 model = load_model()
 
-sample_customer = {
-    "gender": "Female",
-    "SeniorCitizen": 0,
-    "Partner": "Yes",
-    "Dependents": "No",
-    "tenure": 12,
-    "PhoneService": "Yes",
-    "MultipleLines": "No",
-    "InternetService": "DSL",
-    "OnlineSecurity": "Yes",
-    "OnlineBackup": "No",
-    "DeviceProtection": "No",
-    "TechSupport": "Yes",
-    "StreamingTV": "No",
-    "StreamingMovies": "No",
-    "Contract": "Month-to-month",
-    "PaperlessBilling": "Yes",
-    "PaymentMethod": "Electronic check",
-    "MonthlyCharges": 65.5,
-    "TotalCharges": 780.0,
+customer = {
+   "gender": "Female",
+   "SeniorCitizen": 0,
+   "Partner": "Yes",
+   "Dependents": "No",
+   "tenure": 12,
+   "PhoneService": "Yes",
+   "MultipleLines": "No",
+   "InternetService": "DSL",
+   "OnlineSecurity": "Yes",
+   "OnlineBackup": "No",
+   "DeviceProtection": "No",
+   "TechSupport": "Yes",
+   "StreamingTV": "No",
+   "StreamingMovies": "No",
+   "Contract": "Month-to-month",
+   "PaperlessBilling": "Yes",
+   "PaymentMethod": "Electronic check",
+   "MonthlyCharges": 65.5,
+   "TotalCharges": 780.0,
 }
 
-print(predict_single(sample_customer, model=model))
+print(predict_single(customer, model=model))
 ```
 
-## Model Training Summary
+## CI/CD quality gate
 
-Training metrics are written to `models/model_metrics.json` on each run. The best model is selected based on churn-oriented F1 score.
+Pipeline defined in [ci.yml](.github/workflows/ci.yml):
 
-## Future Improvements
+1. Install dependencies
+2. Lint with Ruff
+3. Run Pytest suite
+4. Execute training smoke test
 
-- add cross-validation and hyperparameter tuning
-- add model calibration and threshold optimization for retention campaigns
-- add data validation checks for production inference
-- package the app with Docker for deployment
-- add CI pipeline for tests and linting
+## Assumptions
+
+1. Training and inference use the same data schema as Telco churn source.
+2. Binary classification threshold defaults to model default (`0.5` for probabilistic classifiers).
+3. Current deployment target is local Streamlit execution.
+
+## Next enterprise upgrades
+
+1. Add experiment tracking (MLflow)
+2. Add model registry + promotion workflow
+3. Containerize app and training jobs
+4. Add scheduled retraining and drift monitoring
+5. Add API serving layer (FastAPI) for integration with CRM systems

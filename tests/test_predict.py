@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pandas as pd
+import pytest
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 
@@ -91,3 +92,15 @@ def test_predict_batch_dataframe_shape() -> None:
     assert len(batch_output["predicted_class"]) == 3
     assert len(batch_output["predicted_label"]) == 3
     assert batch_output["churn_probability"] is not None
+
+
+def test_predict_single_raises_on_missing_required_feature() -> None:
+    model = fit_test_pipeline()
+    invalid_record = {
+        "gender": "Female",
+        "SeniorCitizen": 0,
+        "Partner": "Yes",
+    }
+
+    with pytest.raises(ValueError, match="Missing required input features"):
+        predict_single(invalid_record, model=model)

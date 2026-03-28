@@ -1,0 +1,33 @@
+{
+  "trained_at_utc": "2026-03-28T15:37:34.806140+00:00",
+  "dataset_rows": 7032,
+  "train_rows": 5625,
+  "test_rows": 1407,
+  "feature_count": 19,
+  "feature_names": [
+    "gender",
+    "SeniorCitizen",
+    "Partner",
+    "Dependents",
+    "tenure",
+    "PhoneService",
+    "MultipleLines",
+    "InternetService",
+    "OnlineSecurity",
+    "OnlineBackup",
+    "DeviceProtection",
+    "TechSupport",
+    "StreamingTV",
+    "StreamingMovies",
+    "Contract",
+    "PaperlessBilling",
+    "PaymentMethod",
+    "MonthlyCharges",
+    "TotalCharges"
+  ],
+  "best_model": "LogisticRegression",
+  "selection_metric": "f1",
+  "secondary_metric": "roc_auc",
+  "random_state": 42,
+  "test_size": 0.2
+}
