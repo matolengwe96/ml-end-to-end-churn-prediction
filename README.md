@@ -1,6 +1,6 @@
 # Telecom Churn Prediction Platform
 
-Enterprise-grade, portfolio-ready machine learning project that predicts telecom customer churn and serves predictions through a production-style Streamlit interface.
+Enterprise-grade, portfolio-ready machine learning project that predicts telecom customer churn and serves predictions through a production-style Streamlit interface and a hardened FastAPI service.
 
 ## Why this project matters
 
@@ -16,7 +16,8 @@ This repository implements a complete ML workflow:
 4. Best-model selection by F1 with ROC-AUC tie-breaker
 5. Artifact persistence for reproducible inference
 6. Streamlit app for business-friendly scoring
-7. Test suite and CI pipeline for quality gates
+7. FastAPI service for system-to-system scoring
+8. Drift monitoring, experiment tracking, and CI quality gates
 
 ## Dataset
 
@@ -39,12 +40,18 @@ This repository implements a complete ML workflow:
   - training metadata (row counts, timestamp, selected model)
 5. CI automation with lint, tests, and training smoke run
 6. Tooling for reproducible development (`pyproject.toml`, `Makefile`, `ruff`, `pytest`)
+7. Optional MLflow experiment tracking for training runs
+8. Inference monitoring and drift reporting from saved prediction logs
+9. API hardening with request IDs, optional API keys, and rate limiting
+10. Deployment configuration for Docker, Render, and Azure Developer CLI
 
 ## Project structure
 
 ```text
 .
 ├── .github/workflows/ci.yml
+├── api/
+│   └── main.py
 ├── app/
 │   └── app.py
 ├── data/
@@ -64,12 +71,19 @@ This repository implements a complete ML workflow:
 │   ├── __init__.py
 │   ├── config.py
 │   ├── data_preprocessing.py
+│   ├── drift_monitoring.py
 │   ├── evaluate.py
+│   ├── experiment_tracking.py
 │   ├── feature_engineering.py
+│   ├── monitoring.py
 │   ├── predict.py
+│   ├── schemas.py
 │   ├── train.py
 │   └── utils.py
 ├── tests/
+│   ├── test_api.py
+│   ├── test_integration.py
+│   ├── test_monitoring.py
 │   ├── test_predict.py
 │   └── test_train.py
 ├── .gitignore
@@ -88,7 +102,8 @@ This repository implements a complete ML workflow:
   - RandomForestClassifier
   - GradientBoostingClassifier
 4. Evaluate using [src/evaluate.py](src/evaluate.py)
-5. Persist best model and metadata to [models](models)
+5. Log the run to MLflow in [src/experiment_tracking.py](src/experiment_tracking.py)
+6. Persist best model, metadata, and training baseline to [models](models)
 
 ## Quick start
 
@@ -127,16 +142,34 @@ python -m src.train --data-path data/raw/churn.csv
 streamlit run app/app.py
 ```
 
-### 5) Run tests
+### 5) Run API
+
+```bash
+uvicorn api.main:app --reload --port 8000
+```
+
+### 6) Run tests
 
 ```bash
 pytest
 ```
 
-### 6) Run quality checks
+### 7) Run quality checks
 
 ```bash
-ruff check src tests app
+ruff check src tests app api
+```
+
+### 8) Open MLflow UI
+
+```bash
+mlflow ui --backend-store-uri mlruns --port 5000
+```
+
+### 9) Generate a drift report from logged predictions
+
+```bash
+make drift-report
 ```
 
 ## Example prediction usage
@@ -171,6 +204,15 @@ customer = {
 print(predict_single(customer, model=model))
 ```
 
+## API production notes
+
+Inference endpoints support enterprise-oriented controls in [api/main.py](api/main.py):
+
+1. `x-request-id` propagation for request tracing
+2. Optional `x-api-key` authentication via `CHURN_API_KEY`
+3. In-memory per-IP rate limiting via `CHURN_API_RATE_LIMIT`
+4. Monitoring endpoint at `/drift` for inference-vs-training comparison
+
 ## CI/CD quality gate
 
 Pipeline defined in [ci.yml](.github/workflows/ci.yml):
@@ -178,7 +220,13 @@ Pipeline defined in [ci.yml](.github/workflows/ci.yml):
 1. Install dependencies
 2. Lint with Ruff
 3. Run Pytest suite
-4. Execute training smoke test
+5. Execute training smoke test
+
+## Deployment options
+
+1. Docker: [Dockerfile](Dockerfile) and [docker-compose.yml](docker-compose.yml)
+2. Render: [render.yaml](render.yaml)
+3. Azure Developer CLI / App Service: [azure.yaml](azure.yaml)
 
 ## Assumptions
 
@@ -188,8 +236,7 @@ Pipeline defined in [ci.yml](.github/workflows/ci.yml):
 
 ## Next enterprise upgrades
 
-1. Add experiment tracking (MLflow)
-2. Add model registry + promotion workflow
-3. Containerize app and training jobs
-4. Add scheduled retraining and drift monitoring
-5. Add API serving layer (FastAPI) for integration with CRM systems
+1. Add a real model registry and stage promotion policy on top of MLflow
+2. Replace in-memory rate limiting with Redis-backed distributed throttling
+3. Add automated retraining/orchestration with Prefect or GitHub Actions schedules
+4. Emit prediction and drift metrics to Prometheus/Grafana or a cloud APM stack

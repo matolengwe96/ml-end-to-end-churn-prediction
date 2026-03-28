@@ -16,10 +16,12 @@ from sklearn.pipeline import Pipeline
 from src.config import (
     FEATURE_COLUMNS_PATH,
     METRICS_PATH,
+    MLFLOW_ENABLED,
     MODEL_METADATA_PATH,
     MODEL_PATH,
     RANDOM_STATE,
     TEST_SIZE,
+    TRAINING_BASELINE_PATH,
 )
 from src.data_preprocessing import (
     build_preprocessor,
@@ -27,7 +29,9 @@ from src.data_preprocessing import (
     load_raw_data,
     split_features_target,
 )
+from src.drift_monitoring import build_reference_profile, save_reference_profile
 from src.evaluate import compare_models, evaluate_trained_model, format_training_summary
+from src.experiment_tracking import log_training_run
 from src.feature_engineering import extract_transformed_feature_names
 from src.utils import get_logger, print_section, save_json, save_model, setup_logging
 
@@ -125,17 +129,38 @@ def run_training(data_path: str | None = None) -> dict[str, object]:
         "selection_metric": "f1",
         "secondary_metric": "roc_auc",
         "random_state": RANDOM_STATE,
+        "training_baseline_path": str(TRAINING_BASELINE_PATH),
         "test_size": TEST_SIZE,
     }
+    reference_profile = build_reference_profile(X)
+    save_reference_profile(reference_profile, TRAINING_BASELINE_PATH)
+
+    artifact_paths = {
+        "model_path": str(MODEL_PATH),
+        "metrics_path": str(METRICS_PATH),
+        "feature_columns_path": str(FEATURE_COLUMNS_PATH),
+        "training_baseline_path": str(TRAINING_BASELINE_PATH),
+    }
+
+    mlflow_status = log_training_run(
+        best_pipeline=best_pipeline,
+        best_model_name=best_model_name,
+        metrics_by_model=metrics_by_model,
+        metadata=metadata,
+        artifact_paths=artifact_paths,
+    )
+    metadata["mlflow"] = mlflow_status
     save_json(metadata, MODEL_METADATA_PATH)
 
     return {
         "best_model_name": best_model_name,
         "metrics": metrics_by_model,
+        "training_baseline_path": str(TRAINING_BASELINE_PATH),
         "model_path": str(MODEL_PATH),
         "metrics_path": str(METRICS_PATH),
         "feature_columns_path": str(FEATURE_COLUMNS_PATH),
         "metadata_path": str(MODEL_METADATA_PATH),
+        "mlflow_enabled": MLFLOW_ENABLED,
     }
 
 
@@ -163,6 +188,7 @@ def main() -> None:
     print(f"Saved metrics: {result['metrics_path']}")
     print(f"Saved feature columns: {result['feature_columns_path']}")
     print(f"Saved metadata: {result['metadata_path']}")
+    print(f"Saved training baseline: {result['training_baseline_path']}")
     print()
     print(format_training_summary(result["metrics"]))
 

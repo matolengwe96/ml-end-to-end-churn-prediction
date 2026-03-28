@@ -1,9 +1,14 @@
 __pycache__/
 *.pyc
 .pytest_cache/
+.ruff_cache/
 .ipynb_checkpoints/
 .venv/
 venv/
 env/
 .env
 .DS_Store
+logs/*.jsonl
+mlruns/
+htmlcov/
+.coverage

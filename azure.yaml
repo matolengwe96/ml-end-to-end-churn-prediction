@@ -1,0 +1,42 @@
+# Azure Developer CLI (azd) configuration for the Churn ML Project.
+# Deploys both the FastAPI REST service and the Streamlit dashboard
+# as Azure Container Apps backed by Azure Container Registry.
+#
+# Prerequisites:
+#   az login
+#   azd auth login
+#   azd provision   # creates infrastructure from infra/ if using Bicep
+#   azd deploy      # builds and pushes Docker images, updates ACA revisions
+#
+# Environment variables injected at runtime via ACA secrets/env:
+#   CHURN_API_KEY              -- API key for inference endpoints
+#   CHURN_MODEL_PATH           -- /app/models/best_model.joblib
+#   CHURN_MLFLOW_TRACKING_URI  -- optional remote MLflow URI
+#   CHURN_ENABLE_MLFLOW        -- 0 to disable
+
+name: churn-ml-project
+
+services:
+  # ── FastAPI REST service ───────────────────────────────────────────────────
+  api:
+    project: .
+    host: containerapp
+    language: python
+    docker:
+      path: Dockerfile
+      target: api
+    env:
+      - name: WEBSITES_PORT
+        value: '8000'
+
+  # ── Streamlit interactive dashboard ───────────────────────────────────────
+  streamlit:
+    project: .
+    host: containerapp
+    language: python
+    docker:
+      path: Dockerfile
+      target: streamlit
+    env:
+      - name: WEBSITES_PORT
+        value: '8501'

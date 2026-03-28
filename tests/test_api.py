@@ -13,6 +13,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sklearn.pipeline import Pipeline
 
+import api.main as api_main
 from api.main import app
 
 # ── Shared sample payload ─────────────────────────────────────────────────────
@@ -47,6 +48,7 @@ SAMPLE_PAYLOAD: dict = {
 def client(trained_pipeline: Pipeline):
     """Return a TestClient with the fixture pipeline injected as the model."""
     with patch("api.main.load_model", return_value=trained_pipeline):
+        api_main.RATE_LIMIT_BUCKETS.clear()
         with TestClient(app, raise_server_exceptions=True) as c:
             yield c
 
@@ -55,6 +57,7 @@ def client(trained_pipeline: Pipeline):
 def client_no_model():
     """Return a TestClient where model loading always fails."""
     with patch("api.main.load_model", side_effect=FileNotFoundError("no model")):
+        api_main.RATE_LIMIT_BUCKETS.clear()
         with TestClient(app, raise_server_exceptions=False) as c:
             yield c
 
@@ -83,6 +86,7 @@ def test_health_returns_model_not_loaded_when_missing(client_no_model) -> None:
 def test_predict_returns_200(client) -> None:
     response = client.post("/predict", json=SAMPLE_PAYLOAD)
     assert response.status_code == 200
+    assert "x-request-id" in response.headers
 
 
 def test_predict_response_has_expected_keys(client) -> None:
@@ -126,6 +130,30 @@ def test_predict_503_when_no_model(client_no_model) -> None:
     assert response.status_code == 503
 
 
+def test_predict_requires_api_key_when_enabled(client, monkeypatch) -> None:
+    monkeypatch.setattr(api_main, "API_KEY", "secret-token")
+    response = client.post("/predict", json=SAMPLE_PAYLOAD)
+    assert response.status_code == 401
+
+    authorized = client.post(
+        "/predict",
+        json=SAMPLE_PAYLOAD,
+        headers={"x-api-key": "secret-token"},
+    )
+    assert authorized.status_code == 200
+
+
+def test_predict_rate_limit_returns_429(client, monkeypatch) -> None:
+    monkeypatch.setattr(api_main, "API_RATE_LIMIT", 1)
+    api_main.RATE_LIMIT_BUCKETS.clear()
+
+    first = client.post("/predict", json=SAMPLE_PAYLOAD)
+    second = client.post("/predict", json=SAMPLE_PAYLOAD)
+
+    assert first.status_code == 200
+    assert second.status_code == 429
+
+
 # ── Batch predict endpoint ────────────────────────────────────────────────────
 
 
@@ -147,3 +175,39 @@ def test_batch_predict_each_item_has_required_keys(client) -> None:
 def test_batch_predict_empty_list_returns_422(client) -> None:
     response = client.post("/predict/batch", json=[])
     assert response.status_code == 422
+
+
+def test_drift_endpoint_returns_report_structure(client, monkeypatch) -> None:
+    monkeypatch.setattr(
+        api_main,
+        "generate_drift_report",
+        lambda: {
+            "status": "stable",
+            "current_rows": 12,
+            "numeric_drift": {"tenure": {"drift_detected": False}},
+            "categorical_drift": {},
+        },
+    )
+
+    response = client.get("/drift")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "stable"
+    assert payload["current_rows"] == 12
+
+
+def test_drift_endpoint_returns_404_when_baseline_missing(client, monkeypatch) -> None:
+    def _raise_missing() -> dict:
+        raise FileNotFoundError("missing baseline")
+
+    monkeypatch.setattr(api_main, "generate_drift_report", _raise_missing)
+    response = client.get("/drift")
+    assert response.status_code == 404
+
+
+@pytest.fixture(autouse=True)
+def reset_api_guards(monkeypatch):
+    monkeypatch.setattr(api_main, "API_KEY", "")
+    monkeypatch.setattr(api_main, "API_RATE_LIMIT", 60)
+    monkeypatch.setattr(api_main, "API_RATE_LIMIT_WINDOW_SECONDS", 60)
+    api_main.RATE_LIMIT_BUCKETS.clear()

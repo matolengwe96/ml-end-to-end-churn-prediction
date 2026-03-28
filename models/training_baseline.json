@@ -1,0 +1,94 @@
+{
+  "row_count": 7032,
+  "numeric": {
+    "SeniorCitizen": {
+      "mean": 0.16240045506257111,
+      "std": 0.3688439967571051
+    },
+    "tenure": {
+      "mean": 32.421786120591584,
+      "std": 24.545259709263256
+    },
+    "MonthlyCharges": {
+      "mean": 64.79820819112628,
+      "std": 30.085973884049842
+    },
+    "TotalCharges": {
+      "mean": 2283.300440841866,
+      "std": 2266.771361883145
+    }
+  },
+  "categorical": {
+    "gender": {
+      "Male": 0.5046928327645052,
+      "Female": 0.4953071672354949
+    },
+    "Partner": {
+      "No": 0.5174914675767918,
+      "Yes": 0.4825085324232082
+    },
+    "Dependents": {
+      "No": 0.7015073947667805,
+      "Yes": 0.2984926052332196
+    },
+    "PhoneService": {
+      "Yes": 0.9032992036405005,
+      "No": 0.09670079635949944
+    },
+    "MultipleLines": {
+      "No": 0.48137087599544937,
+      "Yes": 0.42192832764505117,
+      "No phone service": 0.09670079635949944
+    },
+    "InternetService": {
+      "Fiber optic": 0.4402730375426621,
+      "DSL": 0.3435722411831627,
+      "No": 0.2161547212741752
+    },
+    "OnlineSecurity": {
+      "No": 0.49729806598407283,
+      "Yes": 0.286547212741752,
+      "No internet service": 0.2161547212741752
+    },
+    "OnlineBackup": {
+      "No": 0.43899317406143346,
+      "Yes": 0.34485210466439137,
+      "No internet service": 0.2161547212741752
+    },
+    "DeviceProtection": {
+      "No": 0.4399886234357224,
+      "Yes": 0.3438566552901024,
+      "No internet service": 0.2161547212741752
+    },
+    "TechSupport": {
+      "No": 0.4937428896473265,
+      "Yes": 0.2901023890784983,
+      "No internet service": 0.2161547212741752
+    },
+    "StreamingTV": {
+      "No": 0.39945961319681456,
+      "Yes": 0.3843856655290102,
+      "No internet service": 0.2161547212741752
+    },
+    "StreamingMovies": {
+      "No": 0.39547781569965873,
+      "Yes": 0.3883674630261661,
+      "No internet service": 0.2161547212741752
+    },
+    "Contract": {
+      "Month-to-month": 0.551052332195677,
+      "Two year": 0.2396188850967008,
+      "One year": 0.20932878270762229
+    },
+    "PaperlessBilling": {
+      "Yes": 0.5927189988623436,
+      "No": 0.4072810011376564
+    },
+    "PaymentMethod": {
+      "Electronic check": 0.3363196814562002,
+      "Mailed check": 0.22810011376564276,
+      "Bank transfer (automatic)": 0.21928327645051193,
+      "Credit card (automatic)": 0.21629692832764505
+    }
+  }
+}

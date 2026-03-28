@@ -1,4 +1,4 @@
-.PHONY: install train test test-cov lint format app api docker-build docker-up pre-commit ci
+.PHONY: install train test test-cov lint format app api docker-build docker-up pre-commit ci drift-report mlflow-ui
 
 install:
 	pip install -r requirements.txt
@@ -23,6 +23,12 @@ app:
 
 api:
 	uvicorn api.main:app --reload --port 8000
+
+drift-report:
+	python -c "from src.drift_monitoring import generate_drift_report; import json; print(json.dumps(generate_drift_report(), indent=2))"
+
+mlflow-ui:
+	mlflow ui --backend-store-uri mlruns --port 5000
 
 docker-build:
 	docker compose build

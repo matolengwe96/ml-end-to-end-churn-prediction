@@ -19,19 +19,31 @@ Interactive docs available at http://localhost:8000/docs
 from __future__ import annotations
 
 import logging
+import time
+import uuid
+from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 from typing import Any
 
 import pandas as pd
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 
-from src.config import METRICS_PATH, MODEL_METADATA_PATH
+from src.config import (
+    API_KEY,
+    API_RATE_LIMIT,
+    API_RATE_LIMIT_WINDOW_SECONDS,
+    METRICS_PATH,
+    MODEL_METADATA_PATH,
+)
+from src.drift_monitoring import generate_drift_report
 from src.monitoring import log_prediction
 from src.predict import load_model, predict_batch, predict_single
 from src.schemas import (
     BatchPredictionResponse,
     CustomerRecord,
+    DriftReportResponse,
     HealthResponse,
     ModelMetricsResponse,
     PredictionResponse,
@@ -42,6 +54,7 @@ LOGGER = logging.getLogger(__name__)
 
 # Module-level model cache populated during startup.
 _MODEL: Any = None
+RATE_LIMIT_BUCKETS: dict[str, deque[float]] = defaultdict(deque)
 
 
 @asynccontextmanager
@@ -78,6 +91,45 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def add_request_context(request: Request, call_next):
+    """Attach a request ID and enforce lightweight per-IP rate limiting."""
+    request_id = request.headers.get("x-request-id", str(uuid.uuid4()))
+    request.state.request_id = request_id
+
+    if request.method == "POST" and request.url.path.startswith("/predict"):
+        client_host = request.client.host if request.client else "unknown"
+        bucket = RATE_LIMIT_BUCKETS[client_host]
+        now = time.monotonic()
+        window_start = now - API_RATE_LIMIT_WINDOW_SECONDS
+
+        while bucket and bucket[0] < window_start:
+            bucket.popleft()
+
+        if len(bucket) >= API_RATE_LIMIT:
+            return Response(
+                content="Rate limit exceeded.",
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                headers={"x-request-id": request_id},
+            )
+
+        bucket.append(now)
+
+    start_time = time.perf_counter()
+    response = await call_next(request)
+    elapsed_ms = (time.perf_counter() - start_time) * 1000
+    response.headers["x-request-id"] = request_id
+    LOGGER.info(
+        "request_id=%s method=%s path=%s status_code=%s duration_ms=%.2f",
+        request_id,
+        request.method,
+        request.url.path,
+        response.status_code,
+        elapsed_ms,
+    )
+    return response
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
@@ -92,6 +144,19 @@ def _require_model() -> Any:
             ),
         )
     return _MODEL
+
+
+def _require_api_key(request: Request) -> None:
+    """Enforce API key auth for inference endpoints when configured."""
+    if not API_KEY:
+        return
+
+    provided_key = request.headers.get("x-api-key", "")
+    if provided_key != API_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized. Provide a valid x-api-key header.",
+        )
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -132,14 +197,33 @@ def get_metrics() -> ModelMetricsResponse:
     return ModelMetricsResponse(metrics=metrics, best_model=best_model)
 
 
+@app.get(
+    "/drift",
+    response_model=DriftReportResponse,
+    tags=["monitoring"],
+    summary="Compare live inference traffic against the training baseline",
+)
+def get_drift_report() -> DriftReportResponse:
+    """Generate a drift summary using the saved baseline and prediction log."""
+    try:
+        report = generate_drift_report()
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    return DriftReportResponse(**report)
+
+
 @app.post(
     "/predict",
     response_model=PredictionResponse,
     tags=["prediction"],
     summary="Predict churn for a single customer",
 )
-def predict_one(record: CustomerRecord) -> PredictionResponse:
+def predict_one(record: CustomerRecord, request: Request) -> PredictionResponse:
     """Returns a churn class label and probability for one customer record."""
+    _require_api_key(request)
     model = _require_model()
     input_df = pd.DataFrame([record.model_dump()])
 
@@ -152,7 +236,12 @@ def predict_one(record: CustomerRecord) -> PredictionResponse:
             detail=str(exc),
         ) from exc
 
-    log_prediction(record.model_dump(), result, source="api")
+    log_prediction(
+        record.model_dump(),
+        result,
+        source="api",
+        request_id=getattr(request.state, "request_id", None),
+    )
     return PredictionResponse(**result)
 
 
@@ -162,8 +251,9 @@ def predict_one(record: CustomerRecord) -> PredictionResponse:
     tags=["prediction"],
     summary="Predict churn for multiple customers",
 )
-def predict_many(records: list[CustomerRecord]) -> BatchPredictionResponse:
+def predict_many(records: list[CustomerRecord], request: Request) -> BatchPredictionResponse:
     """Returns predictions for a list of customer records in one request."""
+    _require_api_key(request)
     if not records:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -194,4 +284,11 @@ def predict_many(records: list[CustomerRecord]) -> BatchPredictionResponse:
         )
         for i in range(len(records))
     ]
+    for index, prediction in enumerate(predictions):
+        log_prediction(
+            records[index].model_dump(),
+            prediction.model_dump(),
+            source="api-batch",
+            request_id=getattr(request.state, "request_id", None),
+        )
     return BatchPredictionResponse(predictions=predictions, count=len(predictions))

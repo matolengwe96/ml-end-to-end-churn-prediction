@@ -96,3 +96,12 @@ class ModelMetricsResponse(BaseModel):
 
     metrics: dict
     best_model: str | None = None
+
+
+class DriftReportResponse(BaseModel):
+    """High-level training-vs-inference drift status."""
+
+    status: str
+    current_rows: int
+    numeric_drift: dict
+    categorical_drift: dict
