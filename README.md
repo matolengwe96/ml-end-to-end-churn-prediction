@@ -1,6 +1,14 @@
 # Telecom Churn Prediction Platform
 
-Enterprise-grade, portfolio-ready machine learning project that predicts telecom customer churn and serves predictions through a production-style Streamlit interface and a hardened FastAPI service.
+Production-ready churn prediction platform built with FastAPI, Streamlit, and scikit-learn, featuring SHAP explainability, model versioning, drift monitoring, rotating audit logs, and Redis-backed rate limiting.
+
+## At a glance
+
+1. End-to-end churn modeling pipeline with training, evaluation, and artifact persistence
+2. FastAPI service for real-time scoring with request tracing and API hardening
+3. Streamlit front end for business users and model explainability workflows
+4. MLOps capabilities: MLflow tracking, model version snapshots, drift monitoring, and quality gates
+5. Deployment-ready setup for local Docker Compose, Render, and Azure
 
 ## Why this project matters
 
@@ -267,6 +275,6 @@ Pipeline defined in [ci.yml](.github/workflows/ci.yml):
 ## Next enterprise upgrades
 
 1. Add a real model registry and stage promotion policy on top of MLflow
-2. Replace in-memory rate limiting with Redis-backed distributed throttling
+2. Move MLflow from local files to a shared managed backend (for team-scale tracking)
 3. Add automated retraining/orchestration with Prefect or GitHub Actions schedules
 4. Emit prediction and drift metrics to Prometheus/Grafana or a cloud APM stack
