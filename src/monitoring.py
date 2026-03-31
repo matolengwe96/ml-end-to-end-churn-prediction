@@ -14,11 +14,42 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from src.config import PREDICTION_LOG_PATH
+from src.config import (
+    PREDICTION_LOG_BACKUP_COUNT,
+    PREDICTION_LOG_MAX_BYTES,
+    PREDICTION_LOG_PATH,
+)
 
 LOGGER = logging.getLogger(__name__)
 
 LOG_PATH: Path = PREDICTION_LOG_PATH
+
+
+def _rotation_path(log_path: Path, index: int) -> Path:
+    """Return a rotated log filename like ``predictions.1.jsonl``."""
+    return log_path.with_name(f"{log_path.stem}.{index}{log_path.suffix}")
+
+
+def _rotate_prediction_logs(log_path: Path, backup_count: int) -> None:
+    """Rotate the current prediction log in-place, keeping a bounded history."""
+    if not log_path.exists():
+        return
+
+    if backup_count <= 0:
+        log_path.unlink(missing_ok=True)
+        return
+
+    oldest_backup = _rotation_path(log_path, backup_count)
+    if oldest_backup.exists():
+        oldest_backup.unlink()
+
+    for index in range(backup_count - 1, 0, -1):
+        source = _rotation_path(log_path, index)
+        target = _rotation_path(log_path, index + 1)
+        if source.exists():
+            source.replace(target)
+
+    log_path.replace(_rotation_path(log_path, 1))
 
 
 def log_prediction(
@@ -51,8 +82,18 @@ def log_prediction(
         "churn_probability": prediction.get("churn_probability"),
     }
 
+    serialized_event = json.dumps(event) + "\n"
+
     try:
+        if (
+            PREDICTION_LOG_MAX_BYTES > 0
+            and PREDICTION_LOG_PATH.exists()
+            and PREDICTION_LOG_PATH.stat().st_size + len(serialized_event.encode("utf-8"))
+            > PREDICTION_LOG_MAX_BYTES
+        ):
+            _rotate_prediction_logs(PREDICTION_LOG_PATH, PREDICTION_LOG_BACKUP_COUNT)
+
         with PREDICTION_LOG_PATH.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps(event) + "\n")
+            fh.write(serialized_event)
     except OSError as exc:
         LOGGER.warning("Failed to write prediction log entry: %s", exc)

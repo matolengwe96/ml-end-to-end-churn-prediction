@@ -14,6 +14,15 @@ from src.utils import get_logger, load_json, save_json
 LOGGER = get_logger(__name__)
 
 
+def _prediction_log_files(log_path: Path) -> list[Path]:
+	"""Return the current prediction log plus any rotated siblings."""
+	current = [log_path] if log_path.exists() else []
+	rotated = sorted(
+		path for path in log_path.parent.glob(f"{log_path.stem}.*{log_path.suffix}") if path.is_file()
+	)
+	return rotated + current
+
+
 def build_reference_profile(features: pd.DataFrame) -> dict[str, Any]:
 	"""Create a lightweight training-data profile for later drift checks."""
 	numeric_columns = features.select_dtypes(include=["number"]).columns.tolist()
@@ -54,19 +63,21 @@ def load_reference_profile(input_path: Path = TRAINING_BASELINE_PATH) -> dict[st
 
 def load_logged_prediction_inputs(log_path: Path = PREDICTION_LOG_PATH) -> pd.DataFrame:
 	"""Read raw inference inputs from the JSONL prediction log."""
-	if not log_path.exists():
+	log_files = _prediction_log_files(log_path)
+	if not log_files:
 		return pd.DataFrame()
 
 	records: list[dict[str, Any]] = []
-	with log_path.open("r", encoding="utf-8") as handle:
-		for line in handle:
-			line = line.strip()
-			if not line:
-				continue
-			payload = json.loads(line)
-			record = payload.get("input_record")
-			if isinstance(record, dict):
-				records.append(record)
+	for path in log_files:
+		with path.open("r", encoding="utf-8") as handle:
+			for line in handle:
+				line = line.strip()
+				if not line:
+					continue
+				payload = json.loads(line)
+				record = payload.get("input_record")
+				if isinstance(record, dict):
+					records.append(record)
 
 	if not records:
 		return pd.DataFrame()

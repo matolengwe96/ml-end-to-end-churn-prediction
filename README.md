@@ -192,6 +192,10 @@ Runtime prediction audit logs are written to `logs/predictions.jsonl` locally an
 are intentionally excluded from git so repository history does not fill up with
 request noise.
 
+The prediction log now rotates automatically once it reaches the configured size
+limit. Use `CHURN_PREDICTION_LOG_MAX_BYTES` and `CHURN_PREDICTION_LOG_BACKUP_COUNT`
+to control how much local audit history is retained.
+
 ## Example prediction usage
 
 ```python
