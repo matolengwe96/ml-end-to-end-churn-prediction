@@ -8,6 +8,7 @@ venv/
 env/
 .env
 .DS_Store
+# Runtime prediction audit logs are generated locally and should not be committed.
 logs/*.jsonl
 mlruns/
 htmlcov/

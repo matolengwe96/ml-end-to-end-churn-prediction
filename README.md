@@ -188,6 +188,10 @@ python -m src.train
 make drift-report
 ```
 
+Runtime prediction audit logs are written to `logs/predictions.jsonl` locally and
+are intentionally excluded from git so repository history does not fill up with
+request noise.
+
 ## Example prediction usage
 
 ```python
