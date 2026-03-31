@@ -24,6 +24,7 @@ This repository implements a complete ML workflow:
 - Source: [data/raw/churn.csv](data/raw/churn.csv)
 - Target: Churn (`Yes` -> `1`, `No` -> `0`)
 - Key cleaning decisions:
+
 1. `TotalCharges` is converted using `errors="coerce"`
 2. rows with invalid `TotalCharges` are removed
 3. `customerID` is excluded from modeling
@@ -34,10 +35,12 @@ This repository implements a complete ML workflow:
 2. Structured logging for training workflows
 3. Inference input validation (required-column checks + feature alignment)
 4. Rich model artifacts:
-  - trained pipeline
-  - model metrics
-  - transformed feature names
-  - training metadata (row counts, timestamp, selected model)
+
+- trained pipeline
+- model metrics
+- transformed feature names
+- training metadata (row counts, timestamp, selected model)
+
 5. CI automation with lint, tests, and training smoke run
 6. Tooling for reproducible development (`pyproject.toml`, `Makefile`, `ruff`, `pytest`)
 7. Optional MLflow experiment tracking for training runs
@@ -98,9 +101,11 @@ This repository implements a complete ML workflow:
 1. Load and clean data using [src/data_preprocessing.py](src/data_preprocessing.py)
 2. Split train/test with reproducible seed from [src/config.py](src/config.py)
 3. Train model candidates in [src/train.py](src/train.py):
-  - LogisticRegression
-  - RandomForestClassifier
-  - GradientBoostingClassifier
+
+- LogisticRegression
+- RandomForestClassifier
+- GradientBoostingClassifier
+
 4. Evaluate using [src/evaluate.py](src/evaluate.py)
 5. Log the run to MLflow in [src/experiment_tracking.py](src/experiment_tracking.py)
 6. Persist best model, metadata, and training baseline to [models](models)
@@ -166,6 +171,17 @@ ruff check src tests app api
 mlflow ui --backend-store-uri mlruns --port 5000
 ```
 
+Local training logs metrics and small artifacts to MLflow by default, but skips
+serializing the full sklearn model into the MLflow run because file-backed
+stores on Windows can become extremely slow. To opt into full MLflow model
+logging when you need it:
+
+```bash
+# PowerShell
+$env:CHURN_MLFLOW_LOG_MODEL = "1"
+python -m src.train
+```
+
 ### 9) Generate a drift report from logged predictions
 
 ```bash
@@ -220,7 +236,7 @@ Pipeline defined in [ci.yml](.github/workflows/ci.yml):
 1. Install dependencies
 2. Lint with Ruff
 3. Run Pytest suite
-5. Execute training smoke test
+4. Execute training smoke test
 
 ## Deployment options
 

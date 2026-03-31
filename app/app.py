@@ -1,9 +1,9 @@
 """Streamlit dashboard for the Telecom Customer Churn Predictor.
 
 Layout
-------
 • 🔮 Predict   — Input form, prediction result, and session history.
 • 📊 Model Metrics — Hold-out and CV metrics for every trained model.
+• 🔍 Explain   — SHAP feature-importance for the last prediction.
 • ℹ️  About      — Business context and quick-start commands.
 """
 
@@ -13,6 +13,7 @@ import pandas as pd
 import streamlit as st
 
 from src.config import METRICS_PATH, MODEL_METADATA_PATH
+from src.explainability import explain_prediction
 from src.predict import load_model, predict_single
 from src.utils import load_json
 
@@ -60,8 +61,8 @@ if "history" not in st.session_state:
 
 
 # ── Tab layout ────────────────────────────────────────────────────────────────────────
-tab_predict, tab_metrics, tab_about = st.tabs(
-    ["🔮 Predict", "📊 Model Metrics", "ℹ️ About"]
+tab_predict, tab_metrics, tab_explain, tab_about = st.tabs(
+    ["🔮 Predict", "📊 Model Metrics", "🔍 Explain", "ℹ️ About"]
 )
 
 
@@ -215,6 +216,9 @@ with tab_predict:
                     "Probability": f"{churn_prob:.1%}" if churn_prob is not None else "N/A",
                 },
             )
+            # Cache for the Explain tab.
+            st.session_state.last_input_df = input_df
+            st.session_state.last_prediction = prediction
         except Exception as exc:
             st.error(f"Prediction failed: {exc}")
 
@@ -277,7 +281,71 @@ with tab_metrics:
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# TAB 3: About
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# TAB 3: Explain (SHAP)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+with tab_explain:
+    st.subheader("🔍 Feature Contributions (SHAP)")
+    st.caption(
+        "SHAP explains *why* the model made its decision by attributing "
+        "the probability shift to each input feature."
+    )
+    last_input_df = st.session_state.get("last_input_df")
+    last_pred = st.session_state.get("last_prediction")
+    if last_input_df is None:
+        st.info("Submit a prediction on the **🔮 Predict** tab first.")
+    else:
+        with st.spinner("Computing SHAP values …"):
+            explanation = explain_prediction(model, last_input_df, top_n=15)
+
+        if not explanation["shap_available"]:
+            st.warning(
+                "SHAP is not installed. Install it with `pip install shap` "
+                "to enable explainability."
+            )
+        else:
+            top_features = explanation["top_features"]
+            base_value = explanation["base_value"]
+
+            churn_prob_val = (last_pred or {}).get("churn_probability") or 0.0
+            label_val = (last_pred or {}).get("predicted_label", "—")
+
+            st.metric("Prediction", label_val, delta=f"{churn_prob_val:.1%} churn probability")
+            if base_value is not None:
+                st.caption(f"Model baseline (expected) value: **{base_value:.4f}**")
+
+            if top_features:
+                import matplotlib.pyplot as plt  # noqa: PLC0415
+
+                features = [f["feature"] for f in top_features]
+                values = [f["shap_value"] for f in top_features]
+                colors = ["#e74c3c" if v > 0 else "#2ecc71" for v in values]
+
+                fig, ax = plt.subplots(figsize=(8, max(4, len(features) * 0.45)))
+                bars = ax.barh(features[::-1], values[::-1], color=colors[::-1])
+                ax.axvline(0, color="black", linewidth=0.8, linestyle="--")
+                ax.set_xlabel("SHAP value (impact on log-odds of churn)")
+                ax.set_title("Feature contributions to this prediction")
+                ax.bar_label(bars, fmt="%.4f", padding=3, fontsize=8)
+                plt.tight_layout()
+                st.pyplot(fig)
+                plt.close(fig)
+
+                st.markdown(
+                    "**Red bars** push the prediction toward churn.  "
+                    "**Green bars** push it away from churn."
+                )
+
+                with st.expander("Raw SHAP data", expanded=False):
+                    st.dataframe(
+                        pd.DataFrame(top_features),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# TAB 4: About
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 with tab_about:
     st.subheader("About This Project")

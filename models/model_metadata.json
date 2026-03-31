@@ -1,5 +1,5 @@
 {
-  "trained_at_utc": "2026-03-28T15:57:39.542744+00:00",
+  "trained_at_utc": "2026-03-31T09:03:28.102346+00:00",
   "dataset_rows": 7032,
   "train_rows": 5625,
   "test_rows": 1407,
@@ -31,10 +31,12 @@
   "random_state": 42,
   "training_baseline_path": "C:\\Users\\CONDORGREEN\\Downloads\\churn-ml-project\\models\\training_baseline.json",
   "test_size": 0.2,
+  "version_id": "20260331_090328",
   "mlflow": {
     "enabled": true,
+    "model_logged": false,
     "tracking_uri": "file:///C:/Users/CONDORGREEN/Downloads/churn-ml-project/mlruns",
     "experiment_name": "telecom-churn",
-    "run_id": "43e6a41779bf4d1980e3a619e9d5d343"
+    "run_id": "4592f4dd08444a7fbfffe41b7d8822d3"
   }
 }

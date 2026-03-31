@@ -10,7 +10,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from src.config import MLFLOW_ENABLED, MLFLOW_EXPERIMENT_NAME, MLFLOW_TRACKING_URI
+from src.config import (
+	MLFLOW_ENABLED,
+	MLFLOW_EXPERIMENT_NAME,
+	MLFLOW_LOG_MODEL,
+	MLFLOW_TRACKING_URI,
+)
 from src.utils import get_logger
 
 LOGGER = get_logger(__name__)
@@ -71,17 +76,21 @@ def log_training_run(
 					float(metric_value),
 				)
 
-		for _, artifact_path in artifact_paths.items():
+		for artifact_name, artifact_path in artifact_paths.items():
 			path = Path(artifact_path)
+			if artifact_name == "model_path":
+				continue
 			if path.exists():
 				mlflow.log_artifact(str(path), artifact_path="project_artifacts")
 
-		mlflow.sklearn.log_model(best_pipeline, artifact_path="best_model")
+		if MLFLOW_LOG_MODEL:
+			mlflow.sklearn.log_model(best_pipeline, artifact_path="best_model")
 		run_id = run.info.run_id
 
 	LOGGER.info("Logged training run to MLflow: %s", run_id)
 	return {
 		"enabled": True,
+		"model_logged": MLFLOW_LOG_MODEL,
 		"tracking_uri": tracking_uri,
 		"experiment_name": MLFLOW_EXPERIMENT_NAME,
 		"run_id": run_id,

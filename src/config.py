@@ -30,6 +30,7 @@ class Settings:
 	mlflow_tracking_uri: str
 	mlflow_experiment_name: str
 	mlflow_enabled: bool
+	mlflow_log_model: bool
 	api_key: str
 	api_rate_limit: int
 	api_rate_limit_window_seconds: int
@@ -46,6 +47,7 @@ def _build_settings() -> Settings:
 	random_state = int(os.getenv("CHURN_RANDOM_STATE", "42"))
 	test_size = float(os.getenv("CHURN_TEST_SIZE", "0.2"))
 	mlflow_enabled = os.getenv("CHURN_ENABLE_MLFLOW", "1").strip().lower() in {"1", "true", "yes"}
+	mlflow_log_model = os.getenv("CHURN_MLFLOW_LOG_MODEL", "0").strip().lower() in {"1", "true", "yes"}
 	api_rate_limit = int(os.getenv("CHURN_API_RATE_LIMIT", "60"))
 	api_rate_limit_window_seconds = int(os.getenv("CHURN_API_RATE_LIMIT_WINDOW_SECONDS", "60"))
 
@@ -82,6 +84,7 @@ def _build_settings() -> Settings:
 		),
 		mlflow_experiment_name=os.getenv("CHURN_MLFLOW_EXPERIMENT_NAME", "telecom-churn"),
 		mlflow_enabled=mlflow_enabled,
+		mlflow_log_model=mlflow_log_model,
 		api_key=os.getenv("CHURN_API_KEY", "").strip(),
 		api_rate_limit=api_rate_limit,
 		api_rate_limit_window_seconds=api_rate_limit_window_seconds,
@@ -110,6 +113,7 @@ TEST_SIZE = SETTINGS.test_size
 MLFLOW_TRACKING_URI = SETTINGS.mlflow_tracking_uri
 MLFLOW_EXPERIMENT_NAME = SETTINGS.mlflow_experiment_name
 MLFLOW_ENABLED = SETTINGS.mlflow_enabled
+MLFLOW_LOG_MODEL = SETTINGS.mlflow_log_model
 API_KEY = SETTINGS.api_key
 API_RATE_LIMIT = SETTINGS.api_rate_limit
 API_RATE_LIMIT_WINDOW_SECONDS = SETTINGS.api_rate_limit_window_seconds

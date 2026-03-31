@@ -1,0 +1,29 @@
+{
+  "versions": [
+    {
+      "version_id": "20260328_165233",
+      "model_name": "LogisticRegression",
+      "trained_at_utc": "2026-03-28T16:52:33.609658+00:00",
+      "f1_score": 0.6079545454545454,
+      "roc_auc": 0.8359290473207676,
+      "artifact_path": "C:\\Users\\CONDORGREEN\\Downloads\\churn-ml-project\\models\\versions\\20260328_165233_LogisticRegression.joblib"
+    },
+    {
+      "version_id": "20260328_170242",
+      "model_name": "LogisticRegression",
+      "trained_at_utc": "2026-03-28T17:02:42.267283+00:00",
+      "f1_score": 0.6079545454545454,
+      "roc_auc": 0.8359290473207676,
+      "artifact_path": "C:\\Users\\CONDORGREEN\\Downloads\\churn-ml-project\\models\\versions\\20260328_170242_LogisticRegression.joblib"
+    },
+    {
+      "version_id": "20260331_090328",
+      "model_name": "LogisticRegression",
+      "trained_at_utc": "2026-03-31T09:03:28.111399+00:00",
+      "f1_score": 0.6079545454545454,
+      "roc_auc": 0.8359290473207676,
+      "artifact_path": "C:\\Users\\CONDORGREEN\\Downloads\\churn-ml-project\\models\\versions\\20260331_090328_LogisticRegression.joblib"
+    }
+  ],
+  "active_version": "20260331_090328"
+}

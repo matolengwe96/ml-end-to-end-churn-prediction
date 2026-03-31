@@ -10,7 +10,7 @@ import pandas as pd
 from sklearn.base import clone
 from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import cross_val_score, train_test_split
+from sklearn.model_selection import RandomizedSearchCV, cross_val_score, train_test_split
 from sklearn.pipeline import Pipeline
 
 from src.config import (
@@ -33,6 +33,7 @@ from src.drift_monitoring import build_reference_profile, save_reference_profile
 from src.evaluate import compare_models, evaluate_trained_model, format_training_summary
 from src.experiment_tracking import log_training_run
 from src.feature_engineering import extract_transformed_feature_names
+from src.model_versioning import save_versioned_model
 from src.utils import get_logger, print_section, save_json, save_model, setup_logging
 
 LOGGER = get_logger(__name__)
@@ -49,7 +50,53 @@ def build_model_candidates() -> dict[str, object]:
     }
 
 
-def train_and_compare_models(X: pd.DataFrame, y: pd.Series):
+def _tune_estimator(estimator: object, X_train: pd.DataFrame, y_train: pd.Series) -> object:
+    """Wrap estimator in RandomizedSearchCV and return best fitted estimator."""
+    param_grids: dict[str, dict[str, list]] = {
+        "LogisticRegression": {
+            "C": [0.01, 0.1, 1.0, 10.0, 100.0],
+            "solver": ["lbfgs", "saga"],
+            "penalty": ["l2"],
+        },
+        "RandomForestClassifier": {
+            "n_estimators": [100, 200, 300, 500],
+            "max_depth": [None, 5, 10, 20],
+            "min_samples_split": [2, 5, 10],
+            "min_samples_leaf": [1, 2, 4],
+            "max_features": ["sqrt", "log2"],
+        },
+        "GradientBoostingClassifier": {
+            "n_estimators": [100, 200, 300],
+            "learning_rate": [0.01, 0.05, 0.1, 0.2],
+            "max_depth": [3, 5, 7],
+            "subsample": [0.7, 0.8, 1.0],
+        },
+    }
+    name = type(estimator).__name__
+    grid = param_grids.get(name, {})
+    if not grid:
+        return estimator
+    rscv = RandomizedSearchCV(
+        estimator,
+        param_distributions=grid,
+        n_iter=20,
+        scoring="f1",
+        cv=3,
+        random_state=RANDOM_STATE,
+        n_jobs=-1,
+        refit=True,
+    )
+    rscv.fit(X_train, y_train)
+    LOGGER.info(
+        "Tuned %s — best params: %s  best CV-F1: %.4f",
+        name,
+        rscv.best_params_,
+        rscv.best_score_,
+    )
+    return rscv.best_estimator_
+
+
+def train_and_compare_models(X: pd.DataFrame, y: pd.Series, tune: bool = False):
     """Train model pipelines and compare performance on held-out test data."""
     X_train, X_test, y_train, y_test = train_test_split(
         X,
@@ -66,6 +113,10 @@ def train_and_compare_models(X: pd.DataFrame, y: pd.Series):
     metrics_by_model: dict[str, dict[str, float | None]] = {}
 
     for model_name, estimator in candidates.items():
+        if tune:
+            LOGGER.info("Tuning %s ...", model_name)
+            estimator = _tune_estimator(estimator, X_train, y_train)
+
         pipeline = Pipeline(
             steps=[
                 ("preprocessor", clone(preprocessor)),
@@ -94,7 +145,7 @@ def train_and_compare_models(X: pd.DataFrame, y: pd.Series):
     return best_model_name, best_pipeline, metrics_by_model, X.columns.tolist(), X_train.shape[0], X_test.shape[0]
 
 
-def run_training(data_path: str | None = None) -> dict[str, object]:
+def run_training(data_path: str | None = None, tune: bool = False) -> dict[str, object]:
     """Main training workflow used by CLI and external callers."""
     if data_path:
         raw_df = load_raw_data(data_path=Path(data_path))
@@ -110,7 +161,7 @@ def run_training(data_path: str | None = None) -> dict[str, object]:
         feature_names,
         train_rows,
         test_rows,
-    ) = train_and_compare_models(X, y)
+    ) = train_and_compare_models(X, y, tune=tune)
 
     save_model(best_pipeline, MODEL_PATH)
     save_json(metrics_by_model, METRICS_PATH)
@@ -132,6 +183,14 @@ def run_training(data_path: str | None = None) -> dict[str, object]:
         "training_baseline_path": str(TRAINING_BASELINE_PATH),
         "test_size": TEST_SIZE,
     }
+    # Save versioned copy alongside the canonical best_model.joblib.
+    version_id = save_versioned_model(
+        best_pipeline,
+        best_model_name,
+        metrics_by_model[best_model_name],
+    )
+    metadata["version_id"] = version_id
+
     reference_profile = build_reference_profile(X)
     save_reference_profile(reference_profile, TRAINING_BASELINE_PATH)
 
@@ -161,6 +220,7 @@ def run_training(data_path: str | None = None) -> dict[str, object]:
         "feature_columns_path": str(FEATURE_COLUMNS_PATH),
         "metadata_path": str(MODEL_METADATA_PATH),
         "mlflow_enabled": MLFLOW_ENABLED,
+        "version_id": version_id,
     }
 
 
@@ -173,6 +233,12 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional override for input CSV path.",
     )
+    parser.add_argument(
+        "--tune",
+        action="store_true",
+        default=False,
+        help="Enable RandomizedSearchCV hyperparameter tuning (slower, better results).",
+    )
     return parser.parse_args()
 
 
@@ -181,7 +247,7 @@ def main() -> None:
     setup_logging()
     args = parse_args()
     LOGGER.info("Starting training run")
-    result = run_training(data_path=args.data_path)
+    result = run_training(data_path=args.data_path, tune=args.tune)
     print_section("Training Complete")
     print(f"Best model: {result['best_model_name']}")
     print(f"Saved model: {result['model_path']}")

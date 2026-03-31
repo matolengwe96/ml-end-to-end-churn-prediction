@@ -1,11 +1,12 @@
 """FastAPI REST service for the Telecom Churn Prediction pipeline.
 
 Endpoints
----------
 GET  /health          — API liveness + model readiness check
 GET  /metrics         — Evaluation metrics for all trained models
 POST /predict         — Single-record churn prediction
 POST /predict/batch   — Batch churn prediction (list of records)
+POST /explain         — SHAP feature-importance for a single prediction
+GET  /versions        — List all saved model versions
 
 Run locally
 -----------
@@ -44,8 +45,10 @@ from src.schemas import (
     BatchPredictionResponse,
     CustomerRecord,
     DriftReportResponse,
+    ExplainResponse,
     HealthResponse,
     ModelMetricsResponse,
+    ModelVersionsResponse,
     PredictionResponse,
 )
 from src.utils import load_json
@@ -292,3 +295,61 @@ def predict_many(records: list[CustomerRecord], request: Request) -> BatchPredic
             request_id=getattr(request.state, "request_id", None),
         )
     return BatchPredictionResponse(predictions=predictions, count=len(predictions))
+
+
+@app.post(
+    "/explain",
+    response_model=ExplainResponse,
+    tags=["prediction"],
+    summary="SHAP feature importance for a single customer prediction",
+)
+def explain_one(record: CustomerRecord, request: Request) -> ExplainResponse:
+    """Returns the top SHAP feature contributions alongside the churn prediction."""
+    from src.explainability import explain_prediction  # noqa: PLC0415
+
+    _require_api_key(request)
+    model = _require_model()
+    input_df = pd.DataFrame([record.model_dump()])
+
+    try:
+        result = predict_single(input_df, model=model)
+        explanation = explain_prediction(model, input_df)
+    except Exception as exc:
+        LOGGER.error("Explain failed: %s", exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
+
+    return ExplainResponse(
+        predicted_class=result["predicted_class"],
+        predicted_label=result["predicted_label"],
+        churn_probability=result.get("churn_probability"),
+        top_features=explanation["top_features"],
+        base_value=explanation["base_value"],
+        shap_available=explanation["shap_available"],
+    )
+
+
+@app.get(
+    "/versions",
+    response_model=ModelVersionsResponse,
+    tags=["model"],
+    summary="List all saved model versions",
+)
+def get_versions() -> ModelVersionsResponse:
+    """Returns the version registry with all trained model snapshots."""
+    from src.model_versioning import list_versions  # noqa: PLC0415
+
+    try:
+        data = list_versions()
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Version registry not found. Train the model first.",
+        ) from exc
+
+    return ModelVersionsResponse(
+        versions=data.get("versions", []),
+        active_version=data.get("active_version"),
+    )

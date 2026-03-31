@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: ["main"]
+    branches: ['main']
   pull_request:
-    branches: ["main"]
+    branches: ['main']
 
 jobs:
   # ── Code quality ────────────────────────────────────────────────────────────
@@ -16,7 +16,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
       - name: Install linting tools
         run: pip install ruff
@@ -34,7 +34,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ['3.10', '3.11', '3.12']
 
     steps:
       - uses: actions/checkout@v4
@@ -49,7 +49,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run tests with coverage
-        run: pytest --cov=src --cov=api --cov-report=xml -q
+        run: pytest --cov=src --cov=api --cov-report=xml --cov-fail-under=70 -q
 
       - name: Upload coverage to Codecov
         if: matrix.python-version == '3.11'
@@ -68,7 +68,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
       - name: Install dependencies
         run: |

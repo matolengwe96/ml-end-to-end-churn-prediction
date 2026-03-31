@@ -105,3 +105,40 @@ class DriftReportResponse(BaseModel):
     current_rows: int
     numeric_drift: dict
     categorical_drift: dict
+
+
+class ExplainFeature(BaseModel):
+    """SHAP contribution of a single feature to the prediction."""
+
+    feature: str
+    shap_value: float
+    direction: str
+
+
+class ExplainResponse(BaseModel):
+    """SHAP explanation for a single prediction."""
+
+    predicted_class: int
+    predicted_label: str
+    churn_probability: float | None = None
+    top_features: list[ExplainFeature]
+    base_value: float | None = None
+    shap_available: bool
+
+
+class ModelVersion(BaseModel):
+    """Metadata for a single saved model version."""
+
+    version_id: str
+    model_name: str
+    trained_at_utc: str
+    f1_score: float | None = None
+    roc_auc: float | None = None
+    artifact_path: str
+
+
+class ModelVersionsResponse(BaseModel):
+    """Registry of all saved model versions."""
+
+    versions: list[ModelVersion]
+    active_version: str | None = None
