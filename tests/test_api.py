@@ -72,6 +72,7 @@ def test_health_returns_200_when_model_loaded(client) -> None:
     assert data["status"] == "healthy"
     assert data["model_loaded"] is True
     assert "version" in data
+    assert data["rate_limit_backend"] in {"memory", "redis"}
 
 
 def test_health_returns_model_not_loaded_when_missing(client_no_model) -> None:
@@ -146,6 +147,44 @@ def test_predict_requires_api_key_when_enabled(client, monkeypatch) -> None:
 def test_predict_rate_limit_returns_429(client, monkeypatch) -> None:
     monkeypatch.setattr(api_main, "API_RATE_LIMIT", 1)
     api_main.RATE_LIMIT_BUCKETS.clear()
+    monkeypatch.setattr(api_main, "REDIS_RATE_LIMITER", None)
+
+    first = client.post("/predict", json=SAMPLE_PAYLOAD)
+    second = client.post("/predict", json=SAMPLE_PAYLOAD)
+
+    assert first.status_code == 200
+    assert second.status_code == 429
+
+
+def test_predict_rate_limit_can_use_redis_backend(client, monkeypatch) -> None:
+    class FakeRedisLimiter:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def is_rate_limited(self, client_id: str, limit: int, window_seconds: int):
+            self.calls += 1
+            return (self.calls > 1, 42 if self.calls > 1 else None)
+
+    fake = FakeRedisLimiter()
+    monkeypatch.setattr(api_main, "REDIS_RATE_LIMITER", fake)
+    monkeypatch.setattr(api_main, "API_RATE_LIMIT", 1)
+
+    first = client.post("/predict", json=SAMPLE_PAYLOAD)
+    second = client.post("/predict", json=SAMPLE_PAYLOAD)
+
+    assert first.status_code == 200
+    assert second.status_code == 429
+    assert second.headers["Retry-After"] == "42"
+
+
+def test_predict_falls_back_to_memory_when_redis_errors(client, monkeypatch) -> None:
+    class BrokenRedisLimiter:
+        def is_rate_limited(self, client_id: str, limit: int, window_seconds: int):
+            raise RuntimeError("redis down")
+
+    monkeypatch.setattr(api_main, "REDIS_RATE_LIMITER", BrokenRedisLimiter())
+    monkeypatch.setattr(api_main, "API_RATE_LIMIT", 1)
+    api_main.RATE_LIMIT_BUCKETS.clear()
 
     first = client.post("/predict", json=SAMPLE_PAYLOAD)
     second = client.post("/predict", json=SAMPLE_PAYLOAD)
@@ -210,4 +249,5 @@ def reset_api_guards(monkeypatch):
     monkeypatch.setattr(api_main, "API_KEY", "")
     monkeypatch.setattr(api_main, "API_RATE_LIMIT", 60)
     monkeypatch.setattr(api_main, "API_RATE_LIMIT_WINDOW_SECONDS", 60)
+    monkeypatch.setattr(api_main, "REDIS_RATE_LIMITER", None)
     api_main.RATE_LIMIT_BUCKETS.clear()

@@ -37,10 +37,12 @@ from src.config import (
     API_RATE_LIMIT_WINDOW_SECONDS,
     METRICS_PATH,
     MODEL_METADATA_PATH,
+    REDIS_URL,
 )
 from src.drift_monitoring import generate_drift_report
 from src.monitoring import log_prediction
 from src.predict import load_model, predict_batch, predict_single
+from src.rate_limiting import InMemoryRateLimiter, build_redis_rate_limiter
 from src.schemas import (
     BatchPredictionResponse,
     CustomerRecord,
@@ -58,6 +60,8 @@ LOGGER = logging.getLogger(__name__)
 # Module-level model cache populated during startup.
 _MODEL: Any = None
 RATE_LIMIT_BUCKETS: dict[str, deque[float]] = defaultdict(deque)
+MEMORY_RATE_LIMITER = InMemoryRateLimiter(RATE_LIMIT_BUCKETS)
+REDIS_RATE_LIMITER = build_redis_rate_limiter(REDIS_URL)
 
 
 @asynccontextmanager
@@ -102,21 +106,19 @@ async def add_request_context(request: Request, call_next):
 
     if request.method == "POST" and request.url.path.startswith("/predict"):
         client_host = request.client.host if request.client else "unknown"
-        bucket = RATE_LIMIT_BUCKETS[client_host]
-        now = time.monotonic()
-        window_start = now - API_RATE_LIMIT_WINDOW_SECONDS
-
-        while bucket and bucket[0] < window_start:
-            bucket.popleft()
-
-        if len(bucket) >= API_RATE_LIMIT:
+        limited, retry_after, backend = _enforce_rate_limit(client_host)
+        request.state.rate_limit_backend = backend
+        if limited:
             return Response(
                 content="Rate limit exceeded.",
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                headers={"x-request-id": request_id},
+                headers={
+                    "x-request-id": request_id,
+                    "Retry-After": str(retry_after or 1),
+                },
             )
-
-        bucket.append(now)
+    else:
+        request.state.rate_limit_backend = _rate_limit_backend_name()
 
     start_time = time.perf_counter()
     response = await call_next(request)
@@ -162,6 +164,32 @@ def _require_api_key(request: Request) -> None:
         )
 
 
+def _rate_limit_backend_name() -> str:
+    """Return the currently active rate limiting backend name."""
+    return "redis" if REDIS_RATE_LIMITER is not None else "memory"
+
+
+def _enforce_rate_limit(client_host: str) -> tuple[bool, int | None, str]:
+    """Enforce per-client rate limiting using Redis when available."""
+    if REDIS_RATE_LIMITER is not None:
+        try:
+            limited, retry_after = REDIS_RATE_LIMITER.is_rate_limited(
+                client_host,
+                API_RATE_LIMIT,
+                API_RATE_LIMIT_WINDOW_SECONDS,
+            )
+            return limited, retry_after, "redis"
+        except Exception as exc:
+            LOGGER.warning("Redis rate limit check failed (%s). Falling back to memory.", exc)
+
+    limited, retry_after = MEMORY_RATE_LIMITER.is_rate_limited(
+        client_host,
+        API_RATE_LIMIT,
+        API_RATE_LIMIT_WINDOW_SECONDS,
+    )
+    return limited, retry_after, "memory"
+
+
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 
@@ -173,7 +201,11 @@ def _require_api_key(request: Request) -> None:
 )
 def health_check() -> HealthResponse:
     """Returns 200 with ``model_loaded=true`` when the model is ready."""
-    return HealthResponse(status="healthy", model_loaded=_MODEL is not None)
+    return HealthResponse(
+        status="healthy",
+        model_loaded=_MODEL is not None,
+        rate_limit_backend=_rate_limit_backend_name(),
+    )
 
 
 @app.get(

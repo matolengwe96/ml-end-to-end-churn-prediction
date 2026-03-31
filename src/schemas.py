@@ -89,6 +89,7 @@ class HealthResponse(BaseModel):
     status: str
     model_loaded: bool
     version: str = "1.0.0"
+    rate_limit_backend: str = "memory"
 
 
 class ModelMetricsResponse(BaseModel):

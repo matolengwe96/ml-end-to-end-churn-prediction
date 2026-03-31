@@ -234,8 +234,14 @@ Inference endpoints support enterprise-oriented controls in [api/main.py](api/ma
 
 1. `x-request-id` propagation for request tracing
 2. Optional `x-api-key` authentication via `CHURN_API_KEY`
-3. In-memory per-IP rate limiting via `CHURN_API_RATE_LIMIT`
+3. Distributed Redis-backed per-IP rate limiting via `CHURN_REDIS_URL` with automatic in-memory fallback
 4. Monitoring endpoint at `/drift` for inference-vs-training comparison
+
+For local distributed rate limiting with Docker Compose, start the stack with Redis included:
+
+```bash
+docker compose up --build
+```
 
 ## CI/CD quality gate
 

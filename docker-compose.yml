@@ -1,6 +1,12 @@
 version: "3.9"
 
 services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
   # ── Streamlit interactive dashboard ────────────────────────────────────────
   streamlit:
     build:
@@ -27,6 +33,8 @@ services:
       - ./data:/app/data:ro
     environment:
       - CHURN_MODEL_PATH=/app/models/best_model.joblib
+      - CHURN_REDIS_URL=redis://redis:6379/0
     restart: unless-stopped
     depends_on:
+      - redis
       - streamlit

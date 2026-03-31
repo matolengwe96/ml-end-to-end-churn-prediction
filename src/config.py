@@ -33,6 +33,7 @@ class Settings:
 	mlflow_experiment_name: str
 	mlflow_enabled: bool
 	mlflow_log_model: bool
+	redis_url: str
 	api_key: str
 	api_rate_limit: int
 	api_rate_limit_window_seconds: int
@@ -91,6 +92,7 @@ def _build_settings() -> Settings:
 		mlflow_experiment_name=os.getenv("CHURN_MLFLOW_EXPERIMENT_NAME", "telecom-churn"),
 		mlflow_enabled=mlflow_enabled,
 		mlflow_log_model=mlflow_log_model,
+		redis_url=os.getenv("CHURN_REDIS_URL", "").strip(),
 		api_key=os.getenv("CHURN_API_KEY", "").strip(),
 		api_rate_limit=api_rate_limit,
 		api_rate_limit_window_seconds=api_rate_limit_window_seconds,
@@ -122,6 +124,7 @@ MLFLOW_TRACKING_URI = SETTINGS.mlflow_tracking_uri
 MLFLOW_EXPERIMENT_NAME = SETTINGS.mlflow_experiment_name
 MLFLOW_ENABLED = SETTINGS.mlflow_enabled
 MLFLOW_LOG_MODEL = SETTINGS.mlflow_log_model
+REDIS_URL = SETTINGS.redis_url
 API_KEY = SETTINGS.api_key
 API_RATE_LIMIT = SETTINGS.api_rate_limit
 API_RATE_LIMIT_WINDOW_SECONDS = SETTINGS.api_rate_limit_window_seconds
